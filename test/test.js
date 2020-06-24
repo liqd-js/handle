@@ -5,84 +5,154 @@ const Handle = require('../lib/handle');
 
 describe( 'Tests', () =>
 {
-    it( 'should create handle', () =>
+    describe( 'Handle', () =>
     {
-        let handle = new Handle( 'my-handle', {});
-
-        assert.ok( handle instanceof Function );
-        assert.ok( handle instanceof Handle );
-    });
-
-    it( 'should create handle property', () =>
-    {
-        let handle = new Handle( 'my-handle', {});
-        let handle_foo = handle.foo;
-
-        assert.ok( handle_foo instanceof Function );
-        assert.ok( handle_foo instanceof Handle );
-
-        assert.ok( handle_foo.bar instanceof Function );
-        assert.ok( handle_foo.bar instanceof Handle );
-    });
-
-    it( 'should call handler constructor for handle', () =>
-    {
-        let handler = 
+        it( 'should create handle', () =>
         {
-            construct: ( id, path, args ) => ({ id: id + '[' + path.join('.') +  '](' + args.map( JSON.stringify ).join(',') + ')' })
-        }
+            let handle = new Handle( 'my-handle', {});
 
-        let handle = new Handle( 'my-handle', handler );
-        let handle2 = new Handle( 'my-handle-2', handler );
+            assert.ok( handle instanceof Function );
+            assert.ok( handle instanceof Handle );
+        });
 
-        assert.deepStrictEqual( new handle, { id: 'my-handle[]()' });
-        assert.deepStrictEqual( new handle(), { id: 'my-handle[]()' });
-        assert.deepStrictEqual( new handle2(), { id: 'my-handle-2[]()' });
-        assert.deepStrictEqual( new handle.foo.bar( 'foobar', 1 ), { id: 'my-handle[foo.bar]("foobar",1)' });
+        it( 'should create handle property', () =>
+        {
+            let handle = new Handle( 'my-handle', {});
+            let handle_foo = handle.foo;
+
+            assert.ok( handle_foo instanceof Function );
+            assert.ok( handle_foo instanceof Handle );
+
+            assert.ok( handle_foo.bar instanceof Function );
+            assert.ok( handle_foo.bar instanceof Handle );
+        });
+
+        it( 'should call handler constructor for handle', () =>
+        {
+            let handler = 
+            {
+                construct: ( id, path, args ) => ({ id: id + '[' + path.join('.') +  '](' + args.map( JSON.stringify ).join(',') + ')' })
+            }
+
+            let handle = new Handle( 'my-handle', handler );
+            let handle2 = new Handle( 'my-handle-2', handler );
+
+            assert.deepStrictEqual( new handle, { id: 'my-handle[]()' });
+            assert.deepStrictEqual( new handle(), { id: 'my-handle[]()' });
+            assert.deepStrictEqual( new handle2(), { id: 'my-handle-2[]()' });
+            assert.deepStrictEqual( new handle.foo.bar( 'foobar', 1 ), { id: 'my-handle[foo.bar]("foobar",1)' });
+        });
+
+        it( 'should call handler executor for handle', () =>
+        {
+            let handler = 
+            {
+                apply: ( id, path, args ) => id + '[' + path.join('.') +  '](' + args.map( JSON.stringify ).join(',') + ')'
+            }
+
+            let handle = new Handle( 'my-handle', handler );
+            let handle2 = new Handle( 'my-handle-2', handler );
+
+            assert.equal( handle(), 'my-handle[]()' );
+            assert.equal( handle2(), 'my-handle-2[]()' );
+            assert.equal( handle.foo.bar( 'foobar', 1 ), 'my-handle[foo.bar]("foobar",1)' );
+        });
+
+        it( 'should call handler getter for handle', () =>
+        {
+            let handler = 
+            {
+                get: ( id, path ) => id + '[' + path.join('.') +  '] : ' + 42
+            }
+
+            let handle = new Handle( 'my-handle', handler );
+            let handle2 = new Handle( 'my-handle-2', handler );
+
+            assert.equal( handle.$, 'my-handle[] : 42' );
+            assert.equal( handle2.$, 'my-handle-2[] : 42' );
+            assert.equal( handle.foo.bar.$, 'my-handle[foo.bar] : 42' );
+        });
+
+        it( 'should call handler setter for handle', () =>
+        {
+            let values = {};
+            let handler = 
+            {
+                set: ( id, path, value ) => ( values[ id + '[' + path.join('.') +  ']' ] = value )
+            }
+
+            let handle = new Handle( 'my-handle', handler );
+            let handle2 = new Handle( 'my-handle-2', handler );
+
+            assert.equal( handle.foo = 1, values['my-handle[foo]'] );
+            assert.equal( handle2.foo.bar = 2, values['my-handle-2[foo.bar]'] );
+        });
     });
 
-    it( 'should call handler executor for handle', () =>
+    describe( 'Reflect', () =>
     {
-        let handler = 
+        it( 'should reflect constructor', () =>
         {
-            apply: ( id, path, args ) => id + '[' + path.join('.') +  '](' + args.map( JSON.stringify ).join(',') + ')'
-        }
+            class A
+            {
+                constructor( id )
+                {
+                    this.id = 'A:' + id;
+                    this.b = B;
+                }
+            }
 
-        let handle = new Handle( 'my-handle', handler );
-        let handle2 = new Handle( 'my-handle-2', handler );
+            class B
+            {
+                constructor( id )
+                {
+                    this.id = 'B:' + id;
+                }
+            }
 
-        assert.equal( handle(), 'my-handle[]()' );
-        assert.equal( handle2(), 'my-handle-2[]()' );
-        assert.equal( handle.foo.bar( 'foobar', 1 ), 'my-handle[foo.bar]("foobar",1)' );
-    });
+            let a = Handle.reflect( A, 'construct', [], [ 1 ]);
 
-    it( 'should call handler getter for handle', () =>
-    {
-        let handler = 
+            assert.ok( a instanceof A );
+            assert.equal( a.id, 'A:1' );
+
+            let b = Handle.reflect( B, 'construct', [], [ 1 ]);
+
+            assert.ok( b instanceof B );
+            assert.equal( b.id, 'B:1' );
+
+            let b2 = Handle.reflect( a, 'construct', [ 'b' ], [ 2 ]);
+
+            assert.ok( b2 instanceof B );
+            assert.equal( b2.id, 'B:2' );
+        });
+
+        it( 'should reflect executor', () =>
         {
-            get: ( id, path ) => id + '[' + path.join('.') +  '] : ' + 42
-        }
+            let a = ( id ) => 'A:' + id;
+            let foo = { bar: ( id ) => 'foobar:' + id };
 
-        let handle = new Handle( 'my-handle', handler );
-        let handle2 = new Handle( 'my-handle-2', handler );
+            assert.equal( Handle.reflect( a, 'apply', [], [ 1 ]), 'A:1' );
+            assert.equal( Handle.reflect( foo, 'apply', [ 'bar' ], [ 2 ]), 'foobar:2' );
+        });
 
-        assert.equal( handle.$, 'my-handle[] : 42' );
-        assert.equal( handle2.$, 'my-handle-2[] : 42' );
-        assert.equal( handle.foo.bar.$, 'my-handle[foo.bar] : 42' );
-    });
-
-    it( 'should call handler setter for handle', () =>
-    {
-        let values = {};
-        let handler = 
+        it( 'should reflect getter', () =>
         {
-            set: ( id, path, value ) => ( values[ id + '[' + path.join('.') +  ']' ] = value )
-        }
+            let a = 'A';
+            let foo = { bar: 'foobar' };
 
-        let handle = new Handle( 'my-handle', handler );
-        let handle2 = new Handle( 'my-handle-2', handler );
+            assert.equal( Handle.reflect( a, 'get', []), 'A' );
+            assert.equal( Handle.reflect( foo, 'get', [ 'bar' ]), 'foobar' );
+        });
 
-        assert.equal( handle.foo = 1, values['my-handle[foo]'] );
-        assert.equal( handle2.foo.bar = 2, values['my-handle-2[foo.bar]'] );
+        it( 'should reflect setter', () =>
+        {
+            let foo = { bar: 'foobar', foobar: { foo: 'bar' }};
+
+            assert.equal( Handle.reflect( foo, 'set', [ 'bar' ], 'barfoo' ), 'barfoo' );
+            assert.equal( foo.bar, 'barfoo' );
+
+            assert.equal( Handle.reflect( foo, 'set', [ 'foobar', 'foo' ], 'foo' ), 'foo' );
+            assert.equal( foo.foobar.foo, 'foo' );
+        });
     });
 });
