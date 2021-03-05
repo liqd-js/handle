@@ -9,7 +9,7 @@ describe( 'Tests', () =>
     {
         it( 'should create handle', () =>
         {
-            let handle = new Handle( 'my-handle', {});
+            let handle = new Handle( 'my-handle' );
 
             assert.ok( handle instanceof Function );
             assert.ok( handle instanceof Handle );
